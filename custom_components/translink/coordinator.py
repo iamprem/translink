@@ -34,13 +34,18 @@ class TranslinkCoordinator(DataUpdateCoordinator[list[Arrival]]):
             MIN_SCAN_INTERVAL, entry.data.get("scan_interval", DEFAULT_SCAN_INTERVAL)
         )
 
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=f"{DOMAIN}_{self.stop}_{self.route}_{self.direction}",
-            update_interval=timedelta(seconds=interval),
-            config_entry=entry,
-        )
+        # `config_entry` was added to DataUpdateCoordinator in a later core
+        # release; custom components should load on older installs too.
+        coordinator_args = {
+            "hass": hass,
+            "logger": _LOGGER,
+            "name": f"{DOMAIN}_{self.stop}_{self.route}_{self.direction}",
+            "update_interval": timedelta(seconds=interval),
+        }
+        try:
+            super().__init__(**coordinator_args, config_entry=entry)
+        except TypeError:
+            super().__init__(**coordinator_args)
 
     async def _async_update_data(self) -> list[Arrival]:
         try:

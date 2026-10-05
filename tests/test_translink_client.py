@@ -300,7 +300,7 @@ def test_304_revalidation_reuses_cached_body():
             await client.get_arrivals("1", "1", 5, 1)
             # Force the entry stale so the second call revalidates.
             key = next(iter(client._cache))
-            client._cache[key]["expires"] = datetime.now().astimezone() - timedelta(seconds=1)
+            client._cache[key]["expires"] = (datetime.now().astimezone() - timedelta(seconds=1)).isoformat()
             again = await client.get_arrivals("1", "1", 5, 1)
             expires = client._cache[key]["expires"]
         finally:
@@ -310,7 +310,7 @@ def test_304_revalidation_reuses_cached_body():
     again, seen, expires = asyncio.run(run())
     assert len(seen) == 2, "stale entry should have triggered a revalidation"
     assert again[0].stop_code == TEST_STOP, "304 should return the cached body"
-    assert expires > datetime.now().astimezone(), "304 should extend the TTL"
+    assert datetime.fromisoformat(expires) > datetime.now().astimezone(), "304 should extend the TTL"
 
 
 def test_http_404_raises_translink_error():
@@ -379,3 +379,49 @@ def test_placeholders_are_passed_to_show_form():
             for kw in arg.keywords
         ]
         assert "description_placeholders" not in nested
+
+
+def test_cache_survives_a_json_round_trip():
+    """Regression guard: the cache is persisted as JSON, datetimes are not.
+
+    A save/load cycle used to turn `expires` into a string, and the freshness
+    check then raised TypeError outside the try block -- which failed every
+    poll and left the entity unavailable after the first restart.
+    """
+
+    import asyncio
+
+    async def run():
+        payload = FIXTURE_ARRIVALS
+        session, seen = _counting_session(
+            [httpx.Response(200, json=payload, headers={"etag": 'W/"abc"'})]
+        )
+        client = TranslinkClient(session, {})
+        try:
+            await client.get_arrivals(TEST_STOP, TEST_ROUTE, 5, 1)
+            # Simulate Store.async_save() -> async_load().
+            client._cache = json.loads(json.dumps(client._cache))
+            again = await client.get_arrivals(TEST_STOP, TEST_ROUTE, 5, 1)
+        finally:
+            await session.aclose()
+        return again, seen
+
+    again, seen = asyncio.run(run())
+    assert len(seen) == 1, "reloaded cache should still be fresh"
+    assert again[0].stop_code == TEST_STOP
+
+
+def test_cache_expiry_is_json_serialisable():
+    import asyncio
+
+    async def run():
+        session, _ = _counting_session([httpx.Response(200, json=FIXTURE_ARRIVALS)])
+        client = TranslinkClient(session, {})
+        try:
+            await client.get_arrivals(TEST_STOP, TEST_ROUTE, 5, 1)
+            json.dumps(client._cache)  # must not raise
+            return True
+        finally:
+            await session.aclose()
+
+    assert asyncio.run(run()) is True

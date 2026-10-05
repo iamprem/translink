@@ -220,6 +220,25 @@ def parse_route_directions(payload: Any) -> list[dict[str, Any]]:
     return [d for d in (payload.get("d") or []) if isinstance(d, dict)]
 
 
+def _parse_timestamp(value: Any) -> datetime | None:
+    """Read a cache expiry back.
+
+    The cache is persisted to `.storage` as JSON, so an expiry written as a
+    datetime comes back as an ISO string after a restart. Comparing that string
+    against a datetime raises, which used to fail every poll once the cache had
+    been through one save/load cycle.
+    """
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    return None
+
+
 def _maybe_float(value: Any) -> float | None:
     try:
         return float(value)
@@ -244,7 +263,8 @@ class TranslinkClient:
         now = datetime.now(timezone.utc)
 
         cached = self._cache.get(key)
-        if cached and cached["expires"] > now:
+        expires = _parse_timestamp(cached.get("expires")) if cached else None
+        if expires is not None and expires > now:
             return cached["data"]
 
         headers = {}
@@ -269,7 +289,7 @@ class TranslinkClient:
             raise TranslinkError(f"Error requesting {url}: {err}") from err
 
         if response.status_code == 304 and cached:
-            self._cache[key] = {**cached, "expires": now + ttl}
+            self._cache[key] = {**cached, "expires": (now + ttl).isoformat()}
             return cached["data"]
 
         if response.status_code == 404:
@@ -284,7 +304,7 @@ class TranslinkClient:
 
         self._cache[key] = {
             "data": data,
-            "expires": now + ttl,
+            "expires": (now + ttl).isoformat(),
             "etag": response.headers.get("etag"),
         }
         return data
