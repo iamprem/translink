@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Deploy key generated for the Home Assistant Pi. Never commit.
+.deploy/

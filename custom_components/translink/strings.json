@@ -1,0 +1,38 @@
+{
+  "title": "Translink",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Select a route",
+        "description": "Pick the Translink route you want to track.",
+        "data": {
+          "route": "Route"
+        }
+      },
+      "direction": {
+        "title": "Select a direction",
+        "description": "Which direction does the bus travel, toward {route}?",
+        "data": {
+          "direction": "Direction"
+        }
+      },
+      "stop": {
+        "title": "Select a stop",
+        "description": "Route {route}, direction {direction}. Pick the stop you wait at.",
+        "data": {
+          "stop": "Stop",
+          "query_size": "Number of upcoming buses to show"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the Translink API. Check the network and try again.",
+      "no_routes": "Translink returned no routes.",
+      "no_directions": "That route returned no directions.",
+      "no_stops": "That route and direction returned no usable stops."
+    },
+    "abort": {
+      "already_configured": "That route, direction and stop are already configured."
+    }
+  }
+}

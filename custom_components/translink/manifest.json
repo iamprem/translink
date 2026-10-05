@@ -1,0 +1,12 @@
+{
+  "domain": "translink",
+  "name": "Translink",
+  "codeowners": ["@iamprem"],
+  "config_flow": true,
+  "documentation": "https://github.com/iamprem/translink",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/iamprem/translink/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
