@@ -24,6 +24,8 @@ DEFAULT_SCAN_INTERVAL = 30
 MIN_SCAN_INTERVAL = 15
 
 DEFAULT_QUERY_SIZE = 5
+# How many per-bus entities to create beyond the main next-arrival sensor.
+MAX_BUS_SENSORS = 3
 MAX_QUERY_SIZE = 50
 
 # Endpoint TTLs. Only the last two are hot; everything else is fetched once and
