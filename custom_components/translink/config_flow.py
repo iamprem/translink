@@ -34,6 +34,7 @@ class TranslinkBusConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+        self._stop_names: dict[str, str] = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -118,7 +119,9 @@ class TranslinkBusConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             stop = user_input["stop"]
             self._data["stop"] = stop
-            self._data["stop_name"] = user_input.get("stop_name", stop)
+            # vol.In hands back the stop *code*; map it to the real stop name so
+            # the entity is named after the stop, not a bare number.
+            self._data["stop_name"] = self._stop_names.get(stop, stop)
             self._data["query_size"] = int(user_input.get("query_size", DEFAULT_QUERY_SIZE))
 
             unique = f"{route}_{direction}_{self._data['stop']}"
@@ -140,6 +143,7 @@ class TranslinkBusConfigFlow(ConfigFlow, domain=DOMAIN):
         # Node-only and drop-off-only stops are never boarded, so offering them
         # would create a sensor that can never produce a departure.
         boardable = [s for s in stops if s.code and not s.name.lower().startswith("bay")]
+        self._stop_names = {s.code: s.name for s in boardable}
         options = {s.code: f"{s.name} ({s.code})" for s in boardable}
         if not options:
             errors["base"] = "no_stops"
