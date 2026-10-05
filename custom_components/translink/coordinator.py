@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
@@ -65,7 +66,31 @@ class TranslinkCoordinator(TimestampDataUpdateCoordinator[list[Arrival]]):
         except TranslinkError as err:
             raise UpdateFailed(f"Translink API error: {err}") from err
 
+        arrivals = await self._attach_vehicle_numbers(arrivals)
+
         # Drop departures that have already gone. The API can briefly return a
         # stale first entry right after it passes.
         now = datetime.now().astimezone()
         return [a for a in arrivals if a.arrival > now]
+
+    async def _attach_vehicle_numbers(self, arrivals: list[Arrival]) -> list[Arrival]:
+        """Map each trip to the bus actually running it.
+
+        This is the join the website does: vehiclepositions is tiny (~700
+        bytes) and keyed by trip id. If it fails the ETAs are still good, so
+        the error is swallowed rather than failing the whole update.
+        """
+        try:
+            vehicles = await self.client.get_vehicle_positions(
+                self.route, self.direction
+            )
+        except TranslinkError as err:
+            _LOGGER.debug("Could not fetch vehicle positions: %s", err)
+            return arrivals
+
+        by_trip = {v.trip_id: v.vehicle_id for v in vehicles if v.trip_id}
+        if not by_trip:
+            return arrivals
+        return [
+            replace(a, vehicle_number=by_trip.get(a.trip_id)) for a in arrivals
+        ]

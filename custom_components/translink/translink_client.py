@@ -53,6 +53,10 @@ class Arrival:
     node_only: bool
     stop_code: str
     stop_name: str
+    # The arrivals endpoint only knows the GTFS *trip*. The bus number the
+    # website shows ("Bus #24104") is the vehicle id, which lives in
+    # vehiclepositions and is joined on trip id.
+    vehicle_number: str | None = None
 
     @property
     def minutes_away(self) -> int:

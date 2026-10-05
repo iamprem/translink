@@ -31,6 +31,7 @@ def _arrival_attributes(arrival: Arrival) -> dict[str, Any]:
         "early_minutes": round(-arrival.delay_seconds / 60) if arrival.delay_seconds else 0,
         "timepoint": arrival.timepoint,
         "bay": arrival.bay,
+        "vehicle_number": arrival.vehicle_number,
         "pickup_only": arrival.pickup_only,
         "dropoff_only": arrival.dropoff_only,
         "node_only": arrival.node_only,
@@ -102,6 +103,7 @@ class NextArrivalSensor(SensorEntity):
             attributes["next_is_realtime"] = next_arrival.is_realtime
             attributes["next_delay_seconds"] = next_arrival.delay_seconds
             attributes["headsign"] = next_arrival.headsign
+            attributes["next_vehicle_number"] = next_arrival.vehicle_number
             attributes["destination"] = next_arrival.destination
             attributes.update(
                 {

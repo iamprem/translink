@@ -425,3 +425,57 @@ def test_cache_expiry_is_json_serialisable():
             await session.aclose()
 
     assert asyncio.run(run()) is True
+
+
+def test_vehicle_number_defaults_to_unknown():
+    """The arrivals endpoint carries no bus number; only the join supplies it."""
+    arrivals = parse_arrivals(FIXTURE_ARRIVALS, route=TEST_ROUTE, direction=1)
+    assert all(a.vehicle_number is None for a in arrivals)
+
+
+def test_vehicle_positions_join_on_trip_id():
+    """This is how the website gets 'Bus #24104' from a trip id."""
+    vehicles = parse_vehicle_positions(
+        [
+            {"vi": "24104", "ti": "15495767", "la": 49.17, "ln": -122.83, "ts": 1791163016},
+            {"vi": "24105", "ti": "15495768", "la": 49.10, "ln": -122.65, "ts": 1791163016},
+        ]
+    )
+    by_trip = {v.trip_id: v.vehicle_id for v in vehicles}
+    arrivals = parse_arrivals(FIXTURE_ARRIVALS, route=TEST_ROUTE, direction=1)
+
+    joined = {a.trip_id: by_trip.get(a.trip_id) for a in arrivals}
+    assert joined["15495767"] == "24104"
+    assert joined["15495768"] == "24105"
+    # The timetable-only trip has no bus behind it yet.
+    assert joined["15495769"] is None
+
+
+@pytest.mark.live
+def test_live_arrivals_join_to_real_vehicle_numbers():
+    """The join only yields matches at stops a running bus is still heading to.
+
+    At a route terminus the upcoming trips have not departed, so no vehicle is
+    assigned to them and the join is legitimately empty. Assert the mechanism,
+    not that a match exists.
+    """
+    async def run():
+        client = make_client()
+        try:
+            arrivals = await client.get_arrivals(
+                TEST_STOP, TEST_ROUTE, query_size=6, direction=TEST_DIRECTION
+            )
+            vehicles = await client.get_vehicle_positions(TEST_ROUTE, TEST_DIRECTION)
+            return arrivals, vehicles
+        finally:
+            await client._session.aclose()
+
+    arrivals, vehicles = asyncio.run(run())
+    assert vehicles, "expected buses in service on this route"
+    by_trip = {v.trip_id: v.vehicle_id for v in vehicles}
+    assert all(v.vehicle_id for v in vehicles)
+    for arrival in arrivals:
+        # Either a bus is assigned, or the trip has not departed yet.
+        assert arrival.vehicle_number is None or arrival.vehicle_number == by_trip.get(
+            arrival.trip_id
+        )
