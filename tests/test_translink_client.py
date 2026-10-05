@@ -8,6 +8,7 @@ The live tests are marked so they can be skipped: `pytest -m "not live"`.
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
 from datetime import datetime, timedelta
@@ -326,3 +327,55 @@ def test_http_404_raises_translink_error():
 
     with pytest.raises(TranslinkError):
         asyncio.run(run())
+
+
+# --- static guards -------------------------------------------------------
+
+
+def _config_flow_calls() -> list[ast.Call]:
+    """Every call expression in config_flow.py."""
+    source = Path(__file__).resolve().parents[1] / "custom_components" / "translink" / "config_flow.py"
+    tree = ast.parse(source.read_text())
+    return [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+
+
+def test_vol_schema_calls_take_no_kwargs():
+    """Regression guard: `description_placeholders` belongs to async_show_form.
+
+    Passing it to vol.Schema raises TypeError the moment a user submits that
+    step, which fails the whole config flow with no useful message in the UI.
+    """
+    offenders = []
+    for call in _config_flow_calls():
+        func = call.func
+        if not (isinstance(func, ast.Attribute) and func.attr == "Schema"):
+            continue
+        if [kw.arg for kw in call.keywords]:
+            offenders.append(ast.dump(call)[:120])
+    assert not offenders, f"vol.Schema called with keyword arguments: {offenders}"
+
+
+def test_placeholders_are_passed_to_show_form():
+    """Every description placeholder must reach async_show_form."""
+    source = Path(__file__).resolve().parents[1] / "custom_components" / "translink" / "config_flow.py"
+    tree = ast.parse(source.read_text())
+    show_form_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "async_show_form"
+    ]
+    assert show_form_calls, "expected async_show_form calls"
+    for call in show_form_calls:
+        # Error-path forms are rendered without a schema at all.
+        schema_kwarg = next((kw for kw in call.keywords if kw.arg == "data_schema"), None)
+        if schema_kwarg is None or not isinstance(schema_kwarg.value, ast.Call):
+            continue
+        nested = [
+            kw.arg
+            for arg in schema_kwarg.value.args
+            if isinstance(arg, ast.Call)
+            for kw in arg.keywords
+        ]
+        assert "description_placeholders" not in nested

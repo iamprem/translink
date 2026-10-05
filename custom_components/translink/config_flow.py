@@ -101,10 +101,9 @@ class TranslinkBusConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="direction",
-            data_schema=vol.Schema(
-                {vol.Required("direction"): vol.In(options)}, description_placeholders={"route": route}
-            ),
+            data_schema=vol.Schema({vol.Required("direction"): vol.In(options)}),
             errors=errors,
+            description_placeholders={"route": route},
         )
 
     async def async_step_stop(
