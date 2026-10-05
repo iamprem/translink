@@ -7,25 +7,28 @@ No API key. No cloud service. Nothing to sign up for.
 
 ## Install
 
-### From GitHub (this repo is private, so HACS will not work)
+### HACS (recommended)
 
-HACS can only read public repositories — see
-[hacs.xyz/docs/faq/private_repositories](https://www.hacs.xyz/docs/faq/private_repositories/).
-Clone it onto the Home Assistant host and symlink the component into place,
-from an SSH terminal:
+1. **HACS → Integrations → ⋮ → Custom repositories**, add `iamprem/translink`.
+2. **HACS → Integrations → Translink → Download.**
+3. Restart Home Assistant.
+4. **Settings → Devices & Services → Add Integration → Translink.**
+5. Pick route → direction → stop. Add the integration once per stop.
+
+The repo has no GitHub releases, so HACS offers the tip of `main`. The version
+shown comes from `manifest.json`.
+
+### Manual clone
+
+If you would rather not use HACS, clone the repo onto the Home Assistant host
+and symlink the component into place, from an SSH or web terminal:
 
 ```bash
 cd /config
-git clone --depth 1 git@github.com:iamprem/translink.git translink-src
+git clone --depth 1 https://github.com/iamprem/translink.git translink-src
 mkdir -p custom_components
 ln -s /config/translink-src/custom_components/translink custom_components/translink
 ```
-
-That needs an SSH deploy key on the Pi. Create one on the Pi with
-`ssh-keygen -t ed25519 -f /root/.ssh/translink`, then add the contents of
-`/root/.ssh/translink.pub` under the repository's **Settings → Deploy keys**
-with *Allow write access* unchecked. A deploy key is scoped to this one repo
-and cannot read anything else on your GitHub account.
 
 To update later:
 
@@ -42,19 +45,12 @@ under `custom_components/`, and a symlink to a directory satisfies that.
 ### Manual copy
 
 Copy `custom_components/translink/` into your Home Assistant `config`
-directory, so you end up with `config/custom_components/translink/`.
-
-Either way:
-
-1. Restart Home Assistant.
-2. **Settings → Devices & Services → Add Integration → Translink.**
-3. Pick route → direction → stop. Add the integration once per stop.
+directory, so you end up with `config/custom_components/translink/`, then
+restart.
 
 On Home Assistant OS, `config/` is reachable over SSH or the file editor; on
 Supervised or Container installs it is usually a bind mount such as
 `/usr/src/homeassistant/config`.
-
-If you ever make the repository public, the layout also works with HACS as-is.
 
 ## What you get
 
