@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 
-import httpx
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.storage import Store
 
 from .const import CACHE_KEY, CACHE_VERSION, DOMAIN
@@ -29,13 +29,10 @@ async def async_setup(hass: HomeAssistant, _config: dict) -> bool:
         await store.async_save(cached)
 
     hass.data[DOMAIN] = {
-        "session": httpx.AsyncClient(
-            # The API sends `content-encoding: gzip` for every payload we care
-            # about; asking explicitly keeps the 418 KB schedule fetch at ~49 KB.
-            headers={"Accept-Encoding": "gzip"},
-            timeout=15,
-            follow_redirects=True,
-        ),
+        # HA's shared client. Building an httpx.AsyncClient inline loads the
+        # CA bundle, which is a blocking call and trips HA's event-loop
+        # guard. This client is closed by HA on shutdown, not by us.
+        "session": get_async_client(hass),
         "cache": cached,
         "save": _save,
     }
@@ -43,12 +40,10 @@ async def async_setup(hass: HomeAssistant, _config: dict) -> bool:
 
 
 async def async_shutdown(hass: HomeAssistant) -> None:
-    """Flush the cache and close the session."""
+    """Flush the cache. The HTTP session is owned by Home Assistant."""
     data = hass.data.get(DOMAIN)
-    if not data:
-        return
-    await data["save"]()
-    await data["session"].aclose()
+    if data:
+        await data["save"]()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

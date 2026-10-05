@@ -5,9 +5,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import httpx
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import DEFAULT_QUERY_SIZE, DOMAIN, MAX_QUERY_SIZE
 from .translink_client import TranslinkClient, TranslinkError, parse_route_directions
@@ -16,14 +16,15 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _client(hass) -> TranslinkClient:
-    """Build a throwaway client sharing the integration's cache and session."""
+    """Build a client sharing the integration's cache and HA's HTTP session.
+
+    The config flow runs before async_setup, so the cache may not exist yet.
+    HA owns the shared httpx client and closes it on shutdown; building one
+    here would load the CA bundle inside the event loop.
+    """
     data = hass.data.setdefault(DOMAIN, {})
-    session = data.get("session")
-    if session is None:
-        session = httpx.AsyncClient(
-            headers={"Accept-Encoding": "gzip"}, timeout=15, follow_redirects=True
-        )
-        data["session"] = session
+    session = data.get("session") or get_async_client(hass)
+    data["session"] = session
     return TranslinkClient(session, data.setdefault("cache", {}))
 
 

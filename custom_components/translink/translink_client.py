@@ -267,7 +267,9 @@ class TranslinkClient:
         if expires is not None and expires > now:
             return cached["data"]
 
-        headers = {}
+        # httpx negotiates gzip by default, but be explicit: the timetable
+        # endpoint is 418 KB raw and ~49 KB compressed.
+        headers = {"Accept-Encoding": "gzip"}
         if cached and cached.get("etag"):
             headers["If-None-Match"] = cached["etag"]
 
